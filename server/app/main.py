@@ -13,18 +13,13 @@ from .security import create_access_token, get_current_username, hash_password, 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    kv_client.get_client()  # warm the keep-alive connection pool to DynamicKV
+    kv_client.get_client() 
     yield
     await kv_client.close_client()
 
 
 app = FastAPI(title="Chesstnut Bros API", lifespan=lifespan)
 
-# The client (Vite dev server) runs on a different origin/port than
-# this API, so the browser will block requests without explicit CORS
-# headers. Tightened to a specific origin rather than "*" since the
-# API takes a bearer token — a wildcard origin with credentials is a
-# real security footgun, not just a lint warning.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.client_origin],
@@ -63,9 +58,6 @@ async def list_games(username: str = Depends(get_current_username)):
 
 @app.get("/games/{game_id}", response_model=GameOut)
 async def get_game(game_id: str, username: str = Depends(get_current_username)):
-    # Scoped to this user's games model — there's no way to address
-    # another user's game_id through this call, so no separate
-    # ownership check is needed here.
     game = await game_store.load_game(username, game_id)
     return GameOut(**game)
 
@@ -73,14 +65,11 @@ async def get_game(game_id: str, username: str = Depends(get_current_username)):
 @app.post("/games/{game_id}/move", response_model=MoveResult)
 async def submit_move(game_id: str, body: MoveRequest, username: str = Depends(get_current_username)):
     lock = await game_store.get_game_lock(game_id)
-    async with lock:  # serializes only requests against THIS game — other games are unaffected
+    async with lock:  
         game = await game_store.load_game(username, game_id)
         if game["status"] != "in_progress":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Game already finished")
 
-        # --- Fast path: validate + apply the human move. Synchronous,
-        # no `await` inside it, so it's safe even with logic.py's
-        # global state (see chess_bridge.py's docstring).
         try:
             new_fen, _captured = chess_bridge.apply_move(game["fen"], body.from_sq, body.to_sq)
         except chess_bridge.IllegalMoveError as exc:
@@ -98,10 +87,6 @@ async def submit_move(game_id: str, body: MoveRequest, username: str = Depends(g
                 human_move=[body.from_sq, body.to_sq],
             )
 
-        # --- Slow path: dispatch the engine's reply to an isolated
-        # subprocess. This await does NOT block the server's event
-        # loop — other requests, including other games' fast-path
-        # calls, keep being served while this coroutine waits.
         try:
             result = await engine_client.compute_engine_move(new_fen)
         except engine_client.EngineTimeoutError as exc:
@@ -153,10 +138,6 @@ async def undo_move(game_id: str, username: str = Depends(get_current_username))
         if len(game["moves"]) < 2:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No move to undo yet")
 
-        # Removes your last move AND the engine's reply to it. There's
-        # no in-between state to rewind to — /move always returns both
-        # at once — so a single "undo" click takes you back to right
-        # before your last move, not just before the engine's reply.
         game["moves"] = game["moves"][:-2]
         game["fen"] = chess_bridge.replay_moves(game["moves"])
         expected_version = game["version"]
