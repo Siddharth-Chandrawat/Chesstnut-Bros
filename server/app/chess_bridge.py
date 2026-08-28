@@ -1,44 +1,3 @@
-"""
-The server's direct connection to chesstnut/utils/logic.py, used for
-fast, synchronous move validation and application. This is NOT the
-slow minimax search — that's dispatched to an isolated subprocess by
-engine_client.py. Everything in this file is cheap (microseconds to
-low milliseconds) and safe to run inline on the server's event loop,
-AS LONG AS THE PATCH BELOW HAS BEEN APPLIED.
-
---------------------------------------------------------------------
-REQUIRED PATCH — apply this to chesstnut/utils/logic.py before using
-this file for anything beyond a single game:
-
-logic.py keeps board state — king locations, piece-location lists,
-attack-square arrays, castling flags — as MODULE-LEVEL GLOBALS, and
-`readFen` does not fully reset them: it appends onto the existing
-piece-location lists instead of clearing them, and never touches the
-castling flags at all. This server process is long-lived and handles
-MANY DIFFERENT users' games in sequence, so calling `logic.readFen`
-here for game A and then again for game B WILL corrupt state unless
-`readFen` resets everything it owns at the top of the function:
-
-    blackPiecesLocation = []
-    whitePiecesLocation = []
-    whiteAttackSquares = [0] * 64
-    blackAttackSquares = [0] * 64
-    blackKingLocation = -1
-    whiteKingLocation = -1
-    hasWhiteKingMoved = hasBlackKingMoved = False
-    hasWhiteLeftRookMoved = hasBlackLeftRookMoved = False
-    hasWhiteRightRookMoved = hasBlackRightRookMoved = False
-
-This is required here even though this file never runs a search —
-it's a consequence of calling readFen more than once in one process,
-independent of concurrency.
---------------------------------------------------------------------
-
-Also verify the exact parameter names/order in legalMoves/makeMove
-below against your current logic.py — written to match what was
-read out of the repository, but confirm before trusting this beyond
-local testing.
-"""
 import sys
 from pathlib import Path
 
@@ -140,13 +99,6 @@ def has_legal_moves(fen: str, white_to_move: bool) -> bool:
 
 
 def replay_moves(moves: list) -> str:
-    """
-    Reconstructs the FEN reached after applying `moves` in order from
-    the starting position. The server only ever stores the CURRENT fen
-    plus the move list, not a snapshot per ply — this is what makes
-    "undo" possible without keeping that extra history around: trim
-    the move list and recompute from scratch.
-    """
     fen = STARTING_FEN
     for from_sq, to_sq in moves:
         fen, _captured = apply_move(fen, from_sq, to_sq)
