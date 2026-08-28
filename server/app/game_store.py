@@ -58,13 +58,6 @@ async def create_game(username: str) -> dict:
 
 
 async def load_game(username: str, game_id: str) -> dict:
-    """
-    Games live in a model scoped to their owner (games_<username>),
-    so this can never return a different user's game by construction
-    — DynamicKV has no cross-model key lookup, so the caller must
-    already know whose games to look in. Callers get `username` from
-    the authenticated request, never from the client's input.
-    """
     game = await kv.kv_get(kv.games_model(username), game_id)
     if game is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found")
@@ -72,16 +65,6 @@ async def load_game(username: str, game_id: str) -> dict:
 
 
 async def save_game(game: dict, expected_version: int) -> None:
-    """
-    Optimistic concurrency as a second line of defense underneath the
-    per-game asyncio.Lock: re-check the version immediately before
-    writing, and reject if something else updated this game in the
-    meantime. DynamicKV's API has no compare-and-swap primitive, so
-    this check-then-write is still a narrow race in the abstract —
-    it's the per-game asyncio.Lock (held by the caller for the whole
-    request) that actually closes it for anything going through this
-    server.
-    """
     model = kv.games_model(game["username"])
     current = await kv.kv_get(model, game["game_id"])
     if current is not None and current.get("version", 0) != expected_version:
@@ -95,11 +78,5 @@ async def save_game(game: dict, expected_version: int) -> None:
 
 
 async def list_user_games(username: str) -> list[dict]:
-    """
-    A single GET /{model} against this user's games model. No
-    application-maintained index list needed — DynamicKV already
-    groups records by model, which is what the old _add_game_to_user_index
-    / list_user_games index-list approach was working around.
-    """
     games = await kv.kv_get_all(kv.games_model(username))
     return list(games.values())
