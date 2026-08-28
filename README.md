@@ -19,23 +19,13 @@ Play chess against a custom-built engine, right in your browser. Chesstnut Bros 
 | Client    | React 18, React Router, Vite, [react-chessboard](https://www.npmjs.com/package/react-chessboard), [chess.js](https://www.npmjs.com/package/chess.js) |
 | Server    | FastAPI, Uvicorn, httpx, PyJWT, Passlib (bcrypt) |
 | Engine    | Custom Python chess engine, run as an isolated worker subprocess |
-| Database  | DynamicKV — a custom C++ key-value store |
-
-## Project Structure
-
-```
-Chesstnut-Bros/
-├── client/          # React + Vite front end
-├── server/          # FastAPI backend (auth, game state, engine orchestration)
-├── chesstnut/        # Chess engine + search worker
-└── dynamicKV/        # Custom C++ key-value store used as the database
-```
+| Database  | DynamicKV — a custom C++ key-value store with CROW framework to handle REST API |
 
 ## Prerequisites
 
 - **Python** 3.10+ with `pip`
 - **Node.js** 18+ with `npm`
-- A **C++ compiler / Make** toolchain (only needed if you're building DynamicKV from source — a pre-built `dynamickv` binary is included)
+- A **C++ compiler / Make** toolchain (only needed if you're building DynamicKV from source (run "make" command in src) — a pre-built `dynamickv` binary is included)
 
 ## Setup
 
