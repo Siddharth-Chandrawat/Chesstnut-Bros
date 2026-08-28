@@ -27,39 +27,100 @@ Play chess against a custom-built engine, right in your browser. Chesstnut Bros 
 - **Node.js** 18+ with `npm`
 - A **C++ compiler / Make** toolchain (only needed if you're building DynamicKV from source (run "make" command in src) — a pre-built `dynamickv` binary is included)
 
-## Setup
+# Setup
 
-### 1. Database (DynamicKV)
+## 1. Database — DynamicKV
 
-```bash
+### Build
+
+```
 cd dynamicKV/DB/src
+make
+```
+
+The `make` command runs:
+
+```
+g++ -std=c++17 -O2 \
+    main.cpp config.cpp bloomfilter.cpp segment.cpp segment_mgr.cpp \
+    storage_engine.cpp thread_pool.cpp \
+    -Iinclude -lfmt -pthread \
+    -o dynamickv
+```
+
+Alternatively, download a prebuilt binary from the [Releases](https://github.com/Gamin8ing/DynamicKV/releases) page and unpack it.
+
+### Configure
+
+Edit `config/db.conf` to your liking:
+
+```
+{
+  "data_dir":        "./data",
+  "segment_size_mb": 64,
+  "file_extension":  ".kv",
+  "index_extension": ".idx",
+  "bloom_extension": ".bf",
+  "bloom_bits_kb":   8,
+  "bloom_hashes":    4,
+  "thread_pool_size": 4
+}
+```
+
+* `data_dir` is where your per-model folders (`users/`, `products/`, …) live.
+* Bloom filter and segment sizing come from this configuration.
+
+### Run
+
+```
 ./dynamickv
 ```
 
-This starts the key-value store the server uses for persistence, listening on `http://127.0.0.1:8008` by default.
+By default, DynamicKV listens on port `8008`.
 
-### 2. Server (FastAPI)
+## 2. Server — FastAPI
 
-```bash
+### Install Dependencies
+
+```
 cd server
 pip install -r requirements.txt
-cp .env.example .env   # adjust values as needed
+```
+
+### Configure Environment
+
+```
+cp .env.example .env
+```
+
+Adjust the values in `.env` as needed.
+
+### Run
+
+```
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-The API will be available at `http://127.0.0.1:8000`, with interactive docs at `http://127.0.0.1:8000/docs`.
+The API will be available at `http://127.0.0.1:8000`. Interactive API documentation is available at: `http://127.0.0.1:8000/docs`
 
-### 3. Client (React)
+## 3. Client — React
 
-```bash
+### Install Dependencies
+
+```
 cd client
 npm install
+```
+
+### Run
+
+```
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
+The application will be available at: `http://localhost:5173`
 
-> **Note:** Start the services in this order — DynamicKV, then the server, then the client — since the server connects to DynamicKV on startup and the client expects the server to already be running.
+---
 
 ## Configuration
 
