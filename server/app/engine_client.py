@@ -1,21 +1,3 @@
-"""
-Dispatches the slow minimax search to a fresh, isolated subprocess per
-call. This sidesteps two problems at once:
-
-  1. Python's GIL — a subprocess gets a genuinely separate core;
-     threads would only contend for one.
-  2. Chesstnut's global rules-engine state (see chess_bridge.py) — a
-     brand-new interpreter has fresh globals, so nothing can leak
-     between two different games' searches even without patching
-     readFen. (You should still patch it — see chess_bridge.py — but
-     this file's correctness doesn't depend on that patch.)
-
-Bounded by a semaphore sized to (cpu_count - 1) by default: at most
-that many searches run at once, no matter how many move requests
-arrive. Everything past that limit simply awaits its turn — this does
-NOT block the event loop, so fast-path requests for other games keep
-being served the whole time.
-"""
 import asyncio
 import json
 import sys
